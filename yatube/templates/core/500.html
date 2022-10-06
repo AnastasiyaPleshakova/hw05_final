@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Custom 500
+{% endblock %}
+
+{% block main_block %}
+  <h1>Custom 500</h1>
+  <p>Ошибка на сервере, попробуйте обновить страницу</p>
+  <a href="{% url 'posts:home_page' %}">Идите на главную</a>
+{% endblock %}

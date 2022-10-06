@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% load cache %}
+
+{% block title %}
+  Избранные авторы
+{% endblock %}
+{% block main_block %}
+{% include 'posts/includes/switcher.htm' with follow=True%}
+  <h1>
+    Последние обновления избранных авторов
+  </h1>
+  {% cache 20 index_page with page_obj %}
+    {% for post in page_obj %}
+      {% include 'posts/includes/post_card.html' %}
+    {% endfor %}
+  {% endcache %}
+  {% include 'posts/includes/paginator.htm' %}
+{% endblock %}
