@@ -105,11 +105,7 @@ class PostsCreateFormTests(TestCase):
         )
         self.helper_function_check_create_post(response, form_data)
         post = Post.objects.first()
-        # я понимаю, что переменная одноразовая,
-        # но иначе не могу воспользоваться f-строкой:
-        # ругается на кавычки у ключа
-        name_image = form_data['image'].name
-        self.assertEqual(str(post.image), f'posts/{name_image}')
+        self.assertEqual(str(post.image), f'posts/{form_data["image"].name}')
 
     def test_posts_create_guest(self):
         """Валидная форма не создаёт запись в Posts

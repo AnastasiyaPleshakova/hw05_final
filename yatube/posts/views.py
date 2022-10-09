@@ -30,18 +30,12 @@ def group_posts(request, slug):
 
 # @query_debugger
 def profile(request, username):
-    following = False
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related('group').all()
     author = User.objects.get(username=username)
-    # сначала объединила условия
-    # if request.user.is_authenticated and Follow.objects.filter(
-    #       user=request.user, author=author).exists():
-    #     following = True
-    # но по количеству строк получается одинаково, решила сделать так:
-    if request.user.is_authenticated:
-        following = Follow.objects.filter(user=request.user, author=author).\
-            exists()
+    following = request.user.is_authenticated and author.following.filter(
+        user=request.user
+    )
     context = {
         'page_obj': paginators(request, posts),
         'author': author,
@@ -103,8 +97,9 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    posts = Post.objects.select_related('author', 'group').\
-        filter(author__following__user=request.user)
+    posts = Post.objects.select_related('author', 'group').filter(
+        author__following__user=request.user
+    )
     context = {'page_obj': paginators(request, posts)}
     return render(request, 'posts/follow.html', context)
 
@@ -122,10 +117,9 @@ def profile_follow(request, username):
 
 @login_required
 def profile_unfollow(request, username):
-    follow = get_object_or_404(
+    get_object_or_404(
         Follow,
         author__username=username,
         user=request.user
-    )
-    follow.delete()
+    ).delete()
     return redirect('posts:profile', username=username)

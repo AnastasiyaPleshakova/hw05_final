@@ -55,7 +55,6 @@ class PostsPageTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # можешь пояснить почему меняем местами?
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
         super().tearDownClass()
 
