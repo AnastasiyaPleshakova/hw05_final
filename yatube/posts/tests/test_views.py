@@ -150,7 +150,7 @@ class PostsPageTests(TestCase):
             'group': self.group.pk,
             'image': self.uploaded
         }
-        response = self.authorized_client.post(
+        self.authorized_client.post(
             reverse('posts:post_create'),
             data=form_data,
             follow=True
