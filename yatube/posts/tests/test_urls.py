@@ -122,7 +122,7 @@ class PostsURLTests(TestCase):
                         self.assertRedirects(
                             self.authorized_non_author.get(
                                 reverse(name, args=argument)),
-                            '/follow/'
+                            f'/profile/{self.user_author.username}/'
                         )
                     else:
                         self.assertRedirects(
@@ -158,7 +158,7 @@ class PostsURLTests(TestCase):
                         self.assertRedirects(
                             self.authorized_non_author.get(
                                 reverse(name, args=argument)),
-                            '/follow/'
+                            f'/profile/{self.user_author.username}/'
                         )
                 else:
                     self.assertEqual(

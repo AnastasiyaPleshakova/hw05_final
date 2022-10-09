@@ -31,7 +31,7 @@ class PostsPageTests(TestCase):
             b'\x02\x00\x01\x00\x00\x02\x02\x0C'
             b'\x0A\x00\x3B'
         )
-        uploaded = SimpleUploadedFile(
+        cls.uploaded = SimpleUploadedFile(
             name='small.gif',
             content=small_gif,
             content_type='image/gif'
@@ -45,7 +45,7 @@ class PostsPageTests(TestCase):
             author=cls.user,
             text='Тестовый пост',
             group=cls.group,
-            image=uploaded,
+            image=cls.uploaded,
         )
         cls.comment = Comment.objects.create(
             author=cls.user,
@@ -55,8 +55,9 @@ class PostsPageTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        super().tearDownClass()
+        # можешь пояснить почему меняем местами?
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
 
     def setUp(self) -> None:
         self.authorized_client = Client()
@@ -111,6 +112,7 @@ class PostsPageTests(TestCase):
         form_fields = [
             ('text', forms.fields.CharField),
             ('group', forms.fields.ChoiceField),
+            ('image', forms.fields.ImageField),
         ]
         for name, argument in urls_name:
             with self.subTest(name=name):
@@ -142,23 +144,29 @@ class PostsPageTests(TestCase):
 
     def test_cache_index(self):
         """Список постов хранится в кэше заданное время"""
-        first_response = self.authorized_client.get(reverse('posts:home_page'))
-        post = Post.objects.first()
-        post.text = 'Новый пост'
-        post.save()
-        self.assertEqual(
-            first_response.content,
-            self.authorized_client.get(reverse('posts:home_page')).content
+        Post.objects.all().delete()
+        form_data = {
+            'text': 'Новый пост',
+            'group': self.group.pk,
+            'image': self.uploaded
+        }
+        response = self.authorized_client.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True
         )
+        first_request = self.authorized_client.get(reverse('posts:home_page'))
+        Post.objects.all().delete()
+        second_request = self.authorized_client.get(reverse('posts:home_page'))
+        self.assertEqual(first_request.content, second_request.content)
         cache.clear()
-        self.assertNotEqual(
-            first_response.content,
-            self.authorized_client.get(reverse('posts:home_page')).content
-        )
+        third_request = self.authorized_client.get(reverse('posts:home_page'))
+        self.assertNotEqual(first_request.content, third_request.content)
 
 
 class FollowTests(TestCase):
     COUNT = 1
+    FIRST_OBJECTS = 0
 
     @classmethod
     def setUpClass(cls):
@@ -177,39 +185,61 @@ class FollowTests(TestCase):
         self.authorized_following.force_login(self.following)
 
     def test_follow_for_authorized_user(self):
-        """Авторизированный пользователь может подписываться
-        на пользователей и отписываться от них."""
-        count_following = Follow.objects.count()
-        reverses = (
-            ('posts:profile_follow', (self.following.username,), self.COUNT),
-            (
-                'posts:profile_unfollow',
-                (self.following.username,),
-                count_following
-            ),
+        """Авторизированный пользователь может
+        подписываться на пользователей."""
+        self.authorized_follower.get(reverse(
+            'posts:profile_follow',
+            args=(self.following.username,))
         )
-        for name, argument, count in reverses:
-            with self.subTest(name=name):
-                self.authorized_follower.get(reverse(name, args=argument))
-                self.assertEqual(Follow.objects.count(), count)
-                self.assertRedirects(
-                    self.authorized_follower.get(reverse(name, args=argument)),
-                    reverse('posts:follow_index')
-                )
+        follow = Follow.objects.first()
+        self.assertEqual(follow.user, self.follower)
+        self.assertEqual(follow.author, self.following)
+        self.assertEqual(Follow.objects.count(), self.COUNT)
+
+    def test_unfollow_for_authorized_user(self):
+        """Авторизированный пользователь может
+        отписываться от пользователей."""
+        Follow.objects.create(
+            user=self.follower,
+            author=self.following,
+        )
+        count_after_follow = Follow.objects.count()
+        self.authorized_follower.get(reverse(
+            'posts:profile_unfollow',
+            args=(self.following.username,))
+        )
+        self.assertNotEqual(count_after_follow, Follow.objects.count())
 
     def test_follow_page_show_correct_context(self):
         """Правильный контекст для шаблона follow.htmll."""
-        self.authorized_follower.get(
-            reverse('posts:profile_follow',
-                    args=(self.following.username,))
+        Follow.objects.create(
+            user=self.follower,
+            author=self.following,
         )
         response = self.authorized_follower.get(reverse('posts:follow_index'))
         self.assertEqual(len(response.context['page_obj']), self.COUNT)
-        post = response.context['page_obj'][self.COUNT - self.COUNT]
+        post = response.context['page_obj'][self.FIRST_OBJECTS]
         self.assertEqual(post.text, self.post.text)
         self.assertEqual(post.author, self.post.author)
         response = self.authorized_following.get(reverse('posts:follow_index'))
-        self.assertEqual(
-            len(response.context['page_obj']),
-            self.COUNT - self.COUNT
+        self.assertEqual(len(response.context['page_obj']), self.FIRST_OBJECTS)
+
+    def test_follow_on_oneself(self):
+        count_follow = Follow.objects.count()
+        self.authorized_follower.get(reverse(
+            'posts:profile_follow',
+            args=(self.follower.username,))
         )
+        self.assertEqual(count_follow, Follow.objects.count())
+
+    def test_refollow(self):
+        Follow.objects.create(
+            user=self.follower,
+            author=self.following,
+        )
+        count_follow = Follow.objects.count()
+        self.authorized_follower.get(reverse(
+            'posts:profile_follow',
+            args=(self.following.username,))
+        )
+        self.assertEqual(count_follow, Follow.objects.count())

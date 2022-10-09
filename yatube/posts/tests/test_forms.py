@@ -21,6 +21,7 @@ class PostsCreateFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # cls.tmp_media_root = tempfile.mkdtemp(dir=settings.BASE_DIR)
         cls.form = PostForm()
         cls.user = User.objects.create_user(username='author')
         cls.group = Group.objects.create(
@@ -36,8 +37,8 @@ class PostsCreateFormTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        super().tearDownClass()
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
 
     def setUp(self) -> None:
         self.authorized_client = Client()
@@ -103,6 +104,12 @@ class PostsCreateFormTests(TestCase):
             follow=True
         )
         self.helper_function_check_create_post(response, form_data)
+        post = Post.objects.first()
+        # я понимаю, что переменная одноразовая,
+        # но иначе не могу воспользоваться f-строкой:
+        # ругается на кавычки у ключа
+        name_image = form_data['image'].name
+        self.assertEqual(str(post.image), f'posts/{name_image}')
 
     def test_posts_create_guest(self):
         """Валидная форма не создаёт запись в Posts
@@ -218,3 +225,4 @@ class PostsCreateFormTests(TestCase):
             reverse('posts:post_detail', args=(self.post.pk,))
         )
         self.assertEqual(post.comments.first().text, form_data['text'])
+        self.assertEqual(post.comments.first().author, self.user)

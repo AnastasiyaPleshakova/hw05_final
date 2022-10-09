@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_list_or_404, get_object_or_404, redirect, render
 
 
 from .forms import CommentForm, PostForm
@@ -34,9 +34,12 @@ def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related('group').all()
     author = User.objects.get(username=username)
+    # сначала объединила условия
+    # if request.user.is_authenticated and Follow.objects.filter(user=request.user, author=author).exists()
+        # following = True
+    # но по количеству строк получается одинаково, решила сделать так:
     if request.user.is_authenticated:
-        if Follow.objects.filter(user=request.user, author=author).exists():
-            following = True
+        following = Follow.objects.filter(user=request.user, author=author).exists()
     context = {
         'page_obj': paginators(request, posts),
         'author': author,
@@ -46,7 +49,7 @@ def profile(request, username):
 
 
 def post_detail(request, post_id):
-    post = get_object_or_404(Post, id=post_id)
+    post = get_object_or_404(Post.objects.prefetch_related('comments__author'), id=post_id)
     form = CommentForm()
     context = {
         'post': post,
@@ -95,9 +98,7 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    user = User.objects.get(id=request.user.id)
-    authors = user.follower.values('author')
-    posts = Post.objects.filter(author__in=authors)
+    posts = Post.objects.select_related('author', 'group').filter(author__following__user=request.user)
     context = {'page_obj': paginators(request, posts)}
     return render(request, 'posts/follow.html', context)
 
@@ -105,25 +106,16 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = User.objects.get(username=username)
-    follow = Follow.objects.filter(
-        user=request.user,
-        author=author
-    )
-    if follow.exists() or request.user == author:
-        return redirect('posts:follow_index')
-    Follow.objects.create(
-        user=request.user,
-        author=User.objects.get(username=username)
-    )
-    return redirect('posts:follow_index')
+    if request.user != author:
+        Follow.objects.get_or_create(
+            user=request.user,
+            author=User.objects.get(username=username)
+        )
+    return redirect('posts:profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
-    follow = Follow.objects.filter(
-        user=request.user,
-        author=User.objects.get(username=username)
-    )
-    if follow.exists():
-        follow.delete()
-    return redirect('posts:follow_index')
+    follow = get_object_or_404(Follow, author__username=username, user=request.user)
+    follow.delete()
+    return redirect('posts:profile', username=username)

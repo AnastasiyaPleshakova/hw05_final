@@ -6,11 +6,11 @@
 {% endblock %}
 
 {% block main_block %}
-{% include 'posts/includes/switcher.htm' with index=True%}
+{% include 'posts/includes/switcher.htm' with index=True %}
   <h1>
     Последние обновления на сайте
   </h1>
-  {% cache 20 index_page %}
+  {% cache 20 index_page index page_obj.number%}
     {% for post in page_obj %}
       {% include 'posts/includes/post_card.html' %}
     {% endfor %}
