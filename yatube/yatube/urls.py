@@ -4,8 +4,8 @@ from django.contrib import admin
 from django.urls import include, path
 
 handler404 = 'core.views.page_not_found'
-# handler500 = 'posts.views.server_error'
-# handler403 = 'posts.views.csrf_failure'
+handler500 = 'posts.views.server_error'
+handler403 = 'posts.views.csrf_failure'
 
 urlpatterns = [
     path('about/', include('about.urls', namespace='about')),
